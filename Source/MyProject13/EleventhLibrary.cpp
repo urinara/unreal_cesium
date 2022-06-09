@@ -1,9 +1,9 @@
 // 11thD
 
-
 #include "EleventhLibrary.h"
+#include "HttpModule.h"
 
-void UEleventhLibrary::AsyncExec(FExecDelegate delegate, const FString command, const FString arguments)
+void UEleventhLibrary::AsyncExec(FExecDelegate delegate, const FString& command, const FString& arguments)
 {
     UE_LOG(LogTemp, Warning, TEXT("Command: %s %s"), *command, *arguments);
 
@@ -20,6 +20,30 @@ void UEleventhLibrary::AsyncExec(FExecDelegate delegate, const FString command, 
         {
             delegate.ExecuteIfBound(result);
         });
+
+    });
+
+    //FProcHandle procHandle = FPlatformProcess::CreateProc(*command, *arguments, false, true, true, NULL, 0, NULL, NULL);
+    //return true;
+}
+
+void UEleventhLibrary::AsyncHttp(FExecDelegate delegate, const FString& restApi)
+{
+    UE_LOG(LogTemp, Warning, TEXT("RestApi: %s"), *restApi);
+
+    AsyncTask(ENamedThreads::AnyNormalThreadNormalTask, [delegate, restApi]()
+    {
+        FHttpModule* httpModule = &FHttpModule::Get();
+        TSharedRef<IHttpRequest, ESPMode::ThreadSafe> request = httpModule->CreateRequest();
+        request->SetURL(restApi);
+        request->SetVerb("GET");
+        request->SetHeader("User-Agent", "X-EleventhD-Agent");
+        request->OnProcessRequestComplete().BindLambda([delegate](FHttpRequestPtr req, FHttpResponsePtr res, bool result) {
+            AsyncTask(ENamedThreads::GameThread, [delegate]() {
+                delegate.ExecuteIfBound(true);
+            });
+        });
+        request->ProcessRequest();
 
     });
 
